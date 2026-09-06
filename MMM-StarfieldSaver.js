@@ -9,15 +9,17 @@ Module.register("MMM-StarfieldSaver", {
 		clock24h: false,
 		activityThrottle: 500, // ms, avoid resetting the timer on every mousemove tick
 		activityEvents: ["mousemove", "mousedown", "keydown", "touchstart", "touchmove", "wheel"],
-		// While quiet hours are active, the screensaver never activates on its own timer,
-		// and if it's already showing when quiet hours begin, it's dismissed immediately.
-		// Times are "HH:MM" in 24h local time. An overnight window (start > end, e.g.
-		// "22:00"-"06:00") wraps past midnight correctly.
-		// (Flat keys rather than a nested object: MagicMirror's config/defaults merge is
-		// shallow, so a partial override of a nested object would silently drop the rest.)
+		// While inside any quiet period, the screensaver never activates on its own timer,
+		// and if it's already showing when a quiet period begins, it's dismissed immediately.
+		// Times are "HH:MM" in 24h local time. An overnight period (start > end, e.g.
+		// "22:00"-"06:00") wraps past midnight correctly. Override quietPeriods with your
+		// own full list to customize/add/remove windows (config merge replaces arrays
+		// wholesale, so there's no need to repeat the defaults you want to keep).
 		quietHoursEnabled: true,
-		quietHoursStart: "06:00",
-		quietHoursEnd: "10:00",
+		quietPeriods: [
+			{ start: "06:00", end: "10:00" }, // morning
+			{ start: "17:00", end: "20:00" } // evening
+		],
 		tickInterval: 15000 // ms between idle/quiet-hours checks
 	},
 
@@ -84,17 +86,22 @@ Module.register("MMM-StarfieldSaver", {
 	},
 
 	isQuietHours() {
-		const { quietHoursEnabled, quietHoursStart, quietHoursEnd } = this.config;
-		if (!quietHoursEnabled || !quietHoursStart || !quietHoursEnd) return false;
+		if (!this.config.quietHoursEnabled) return false;
+		const periods = this.config.quietPeriods || [];
+		const now = new Date();
+		const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
-		const [startH, startM] = quietHoursStart.split(":").map(Number);
-		const [endH, endM] = quietHoursEnd.split(":").map(Number);
+		return periods.some((period) => this.isWithinPeriod(nowMinutes, period));
+	},
+
+	isWithinPeriod(nowMinutes, period) {
+		if (!period || !period.start || !period.end) return false;
+
+		const [startH, startM] = period.start.split(":").map(Number);
+		const [endH, endM] = period.end.split(":").map(Number);
 		const startMinutes = startH * 60 + startM;
 		const endMinutes = endH * 60 + endM;
 		if (startMinutes === endMinutes) return false; // zero-length window == disabled
-
-		const now = new Date();
-		const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
 		if (startMinutes < endMinutes) {
 			// same-day window, e.g. 06:00-10:00
