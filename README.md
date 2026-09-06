@@ -6,7 +6,7 @@ Built to reduce static-image burn-in risk on always-on displays (e.g. a calendar
 
 ## Screenshot
 
-A full-screen field of streaking stars radiating from the center, with the current time drifting slowly around the screen.
+![A full-screen field of streaking stars radiating from the center, with the current time drifting around the screen](screenshot.png)
 
 ## Installation
 
