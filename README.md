@@ -28,7 +28,10 @@ Add it to `config.js`. It's a fullscreen overlay, so it must use the `fullscreen
 	config: {
 		idleTimeout: 30 * 60 * 1000, // 30 minutes
 		starCount: 400,
-		clock24h: false
+		clock24h: false,
+		quietHoursEnabled: true,
+		quietHoursStart: "06:00",
+		quietHoursEnd: "10:00"
 	}
 }
 ```
@@ -44,11 +47,15 @@ Add it to `config.js`. It's a fullscreen overlay, so it must use the `fullscreen
 | `clock24h` | `false` | Use 24-hour time format |
 | `activityThrottle` | `500` | Milliseconds to throttle activity-event handling (avoids resetting the idle timer on every `mousemove` tick) |
 | `activityEvents` | `["mousemove", "mousedown", "keydown", "touchstart", "touchmove", "wheel"]` | DOM events on `document` that count as "activity" |
+| `quietHoursEnabled` | `true` | When `true`, the screensaver never auto-activates during the quiet-hours window, and force-dismisses immediately if it's already active when the window begins |
+| `quietHoursStart` | `"06:00"` | Quiet-hours start time, 24h `"HH:MM"` local time |
+| `quietHoursEnd` | `"10:00"` | Quiet-hours end time, 24h `"HH:MM"` local time. If earlier than `quietHoursStart`, the window is treated as wrapping past midnight (e.g. `22:00`–`06:00`) |
+| `tickInterval` | `15000` | Milliseconds between idle/quiet-hours checks |
 
 ## How it works
 
-- Listens for activity events on `document` and resets an idle timer on each one.
-- When the timer elapses, it hides every other module via MagicMirror's own `module.hide()` API (which also triggers each module's `suspend()` lifecycle hook) and renders a `<canvas>` starfield animation plus a drifting clock, positioned `fullscreen_above` so it sits on top of everything.
+- Listens for activity events on `document` and tracks the time of the last one.
+- Every `tickInterval`, it checks: are we idle for at least `idleTimeout` AND outside quiet hours? If so, it hides every other module via MagicMirror's own `module.hide()` API (which also triggers each module's `suspend()` lifecycle hook) and renders a `<canvas>` starfield animation plus a drifting clock, positioned `fullscreen_above` so it sits on top of everything. The same tick also force-dismisses an already-active screensaver the moment quiet hours begin.
 - Any of the configured activity events immediately stops the animation and calls `module.show()` on every other module, restoring the mirror.
 
 ## License

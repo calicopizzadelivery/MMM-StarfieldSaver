@@ -8,12 +8,23 @@ Module.register("MMM-StarfieldSaver", {
 		clockDriftSpeed: 40, // px/sec the clock drifts around the screen
 		clock24h: false,
 		activityThrottle: 500, // ms, avoid resetting the timer on every mousemove tick
-		activityEvents: ["mousemove", "mousedown", "keydown", "touchstart", "touchmove", "wheel"]
+		activityEvents: ["mousemove", "mousedown", "keydown", "touchstart", "touchmove", "wheel"],
+		// While quiet hours are active, the screensaver never activates on its own timer,
+		// and if it's already showing when quiet hours begin, it's dismissed immediately.
+		// Times are "HH:MM" in 24h local time. An overnight window (start > end, e.g.
+		// "22:00"-"06:00") wraps past midnight correctly.
+		// (Flat keys rather than a nested object: MagicMirror's config/defaults merge is
+		// shallow, so a partial override of a nested object would silently drop the rest.)
+		quietHoursEnabled: true,
+		quietHoursStart: "06:00",
+		quietHoursEnd: "10:00",
+		tickInterval: 15000 // ms between idle/quiet-hours checks
 	},
 
 	start() {
 		this.active = false;
-		this.idleTimer = null;
+		this.tickTimer = null;
+		this.lastActivityTime = Date.now();
 		this.lastActivityHandled = 0;
 		this.canvas = null;
 		this.ctx = null;
@@ -31,7 +42,7 @@ Module.register("MMM-StarfieldSaver", {
 		});
 		window.addEventListener("resize", this.boundHandleResize);
 
-		this.resetIdleTimer();
+		this.tickTimer = setInterval(() => this.tick(), this.config.tickInterval);
 	},
 
 	getDom() {
@@ -56,20 +67,53 @@ Module.register("MMM-StarfieldSaver", {
 		return ["MMM-StarfieldSaver.css"];
 	},
 
-	resetIdleTimer() {
-		clearTimeout(this.idleTimer);
-		this.idleTimer = setTimeout(() => this.activate(), this.config.idleTimeout);
+	tick() {
+		const now = Date.now();
+		const inQuietHours = this.isQuietHours();
+
+		if (this.active) {
+			if (inQuietHours) {
+				this.deactivate();
+			}
+			return;
+		}
+
+		if (!inQuietHours && now - this.lastActivityTime >= this.config.idleTimeout) {
+			this.activate();
+		}
+	},
+
+	isQuietHours() {
+		const { quietHoursEnabled, quietHoursStart, quietHoursEnd } = this.config;
+		if (!quietHoursEnabled || !quietHoursStart || !quietHoursEnd) return false;
+
+		const [startH, startM] = quietHoursStart.split(":").map(Number);
+		const [endH, endM] = quietHoursEnd.split(":").map(Number);
+		const startMinutes = startH * 60 + startM;
+		const endMinutes = endH * 60 + endM;
+		if (startMinutes === endMinutes) return false; // zero-length window == disabled
+
+		const now = new Date();
+		const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+		if (startMinutes < endMinutes) {
+			// same-day window, e.g. 06:00-10:00
+			return nowMinutes >= startMinutes && nowMinutes < endMinutes;
+		}
+		// overnight window, e.g. 22:00-06:00
+		return nowMinutes >= startMinutes || nowMinutes < endMinutes;
 	},
 
 	handleActivity() {
 		const now = Date.now();
+		this.lastActivityTime = now;
+
 		if (now - this.lastActivityHandled < this.config.activityThrottle) return;
 		this.lastActivityHandled = now;
 
 		if (this.active) {
 			this.deactivate();
 		}
-		this.resetIdleTimer();
 	},
 
 	handleResize() {
