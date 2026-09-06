@@ -59,6 +59,10 @@ Add it to `config.js`. It's a fullscreen overlay, so it must use the `fullscreen
 - Every `tickInterval`, it checks: are we idle for at least `idleTimeout` AND outside every configured quiet period? If so, it hides every other module via MagicMirror's own `module.hide()` API (which also triggers each module's `suspend()` lifecycle hook) and renders a `<canvas>` starfield animation plus a drifting clock, positioned `fullscreen_above` so it sits on top of everything. The same tick also force-dismisses an already-active screensaver the moment any quiet period begins.
 - Any of the configured activity events immediately stops the animation and calls `module.show()` on every other module, restoring the mirror.
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
+
 ## License
 
 MIT
